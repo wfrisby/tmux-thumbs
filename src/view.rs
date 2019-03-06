@@ -1,10 +1,10 @@
 use std::char;
-use std::default::Default;
 use rustbox::{Color, RustBox, OutputMode};
 use rustbox::Key;
 use super::*;
 
 pub struct View<'a> {
+  rustbox: &'a mut RustBox,
   state: &'a mut state::State<'a>,
   skip: usize,
   reverse: bool,
@@ -18,8 +18,9 @@ pub struct View<'a> {
 }
 
 impl<'a> View<'a> {
-  pub fn new(state: &'a mut state::State<'a>, reverse: bool, unique: bool, position: &'a str, select_foreground_color: Color, foreground_color: Color, background_color: Color, hint_foreground_color: Color, hint_background_color: Color) -> View<'a> {
+  pub fn new(rustbox: &'a mut RustBox, state: &'a mut state::State<'a>, reverse: bool, unique: bool, position: &'a str, select_foreground_color: Color, foreground_color: Color, background_color: Color, hint_foreground_color: Color, hint_background_color: Color) -> View<'a> {
     View{
+      rustbox: rustbox,
       state: state,
       skip: 0,
       reverse: reverse,
@@ -44,19 +45,15 @@ impl<'a> View<'a> {
   }
 
   pub fn present(&mut self) -> Option<(String, bool)> {
-    let mut rustbox = match RustBox::init(Default::default()) {
-      Result::Ok(v) => v,
-      Result::Err(e) => panic!("{}", e),
-    };
 
-    rustbox.set_output_mode(OutputMode::EightBit);
+    self.rustbox.set_output_mode(OutputMode::EightBit);
 
     for (index, line) in self.state.lines.iter().enumerate() {
       let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
       if clean.len() > 0 {
         let formatted = format!("{}\n", line).to_string();
-        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
+        self.rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
       }
     }
 
@@ -88,18 +85,18 @@ impl<'a> View<'a> {
         let extra = prefix.len() - prefix.chars().count();
         let offset = (mat.x as usize) - extra;
 
-        rustbox.print(offset, mat.y as usize, rustbox::RB_NORMAL, selected_color, self.background_color, mat.text);
+        self.rustbox.print(offset, mat.y as usize, rustbox::RB_NORMAL, selected_color, self.background_color, mat.text);
 
         if let Some(ref hint) = mat.hint {
           let extra_position = if self.position == "left" { 0 } else { mat.text.len() - mat.hint.clone().unwrap().len() };
 
-          rustbox.print(offset + extra_position, mat.y as usize, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, hint.as_str());
+          self.rustbox.print(offset + extra_position, mat.y as usize, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, hint.as_str());
         }
       }
 
-      rustbox.present();
+      self.rustbox.present();
 
-      match rustbox.poll_event(false) {
+      match self.rustbox.poll_event(false) {
         Ok(rustbox::Event::KeyEvent(key)) => {
           match key {
             Key::Esc => { break; }

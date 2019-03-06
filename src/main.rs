@@ -1,5 +1,6 @@
 extern crate rustbox;
 extern crate clap;
+extern crate itertools;
 
 mod state;
 mod alphabets;
@@ -7,7 +8,10 @@ mod colors;
 mod view;
 
 use self::clap::{Arg, App};
+use regex::Regex;
+use rustbox::{Color,RustBox};
 use std::process::Command;
+use itertools::Itertools;
 use clap::crate_version;
 
 fn exec_command(command: String) -> std::process::Output {
@@ -76,6 +80,13 @@ fn app_args<'a> () -> clap::ArgMatches<'a> {
     .get_matches();
 }
 
+fn sub_strings(source: &str, sub_size: usize) -> Vec<String> {
+    source.chars()
+        .chunks(sub_size).into_iter()
+        .map(|chunk| chunk.collect::<String>())
+        .collect::<Vec<_>>()
+}
+
 fn main() {
   let args = app_args();
   let alphabet = args.value_of("alphabet").unwrap();
@@ -97,14 +108,33 @@ fn main() {
     "".to_string()
   };
 
-  let execution = exec_command(format!("tmux capture-pane -e -J -p{}", tmux_subcommand));
-  let output = String::from_utf8_lossy(&execution.stdout);
-  let lines = output.split("\n").collect::<Vec<&str>>();
-
-  let mut state = state::State::new(&lines, alphabet);
-
   let selected = {
+    let execution = exec_command(format!("tmux capture-pane -e -J -p{}", tmux_subcommand));
+    let output = String::from_utf8_lossy(&execution.stdout);
+
+    let mut rustbox = match RustBox::init(Default::default()) {
+      Result::Ok(v) => v,
+      Result::Err(e) => panic!("{}", e),
+    };
+
+    let bash_re = Regex::new(r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m").unwrap();
+    let pseudo_lines = sub_strings(bash_re.replace(output.to_string().as_str(), ""), rustbox.width());
+
+    let lines = pseudo_lines.iter().map(|pseudo_line| pseudo_line.split("\n").collect::<Vec<&str>>()).flatten().collect::<Vec<&str>>();
+
+    for (index, line) in lines.iter().enumerate() {
+      let clean = line.trim_end_matches(|c: char| c.is_whitespace());
+
+      if clean.len() > 0 {
+        let formatted = format!("{}\n", line).to_string();
+        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
+      }
+    }
+
+    let mut state = state::State::new(&lines, alphabet);
+
     let mut viewbox = view::View::new(
+      &mut rustbox,
       &mut state,
       reverse,
       unique,
@@ -119,10 +149,10 @@ fn main() {
     viewbox.present()
   };
 
+
   if let Some(pane) = args.value_of("tmux_pane") {
     exec_command(format!("tmux swap-pane -t {}", pane));
   };
-
 
   if let Some((text, paste)) = selected {
     exec_command(str::replace(command, "{}", text.as_str()));
@@ -131,5 +161,4 @@ fn main() {
       exec_command(upcase_command.to_string());
     }
   }
-
 }
