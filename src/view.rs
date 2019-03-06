@@ -1,5 +1,6 @@
 use std::char;
 use std::default::Default;
+use itertools::Itertools;
 use rustbox::{Color, RustBox, OutputMode};
 use rustbox::Key;
 use super::*;
@@ -15,6 +16,13 @@ pub struct View<'a> {
   background_color: Color,
   hint_background_color: Color,
   hint_foreground_color: Color
+}
+
+fn sub_strings(source: &str, sub_size: usize) -> Vec<String> {
+    source.chars()
+        .chunks(sub_size).into_iter()
+        .map(|chunk| chunk.collect::<String>())
+        .collect::<Vec<_>>()
 }
 
 impl<'a> View<'a> {
@@ -51,15 +59,21 @@ impl<'a> View<'a> {
 
     rustbox.set_output_mode(OutputMode::EightBit);
 
+    let mut long_lines = 0;
+
     for (index, line) in self.state.lines.iter().enumerate() {
       let clean = line.trim_end_matches(|c: char| c.is_whitespace());
 
       if clean.len() > 0 {
-        let formatted = format!("{}\n", line).to_string();
-        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
+        for (chunk_index, chunk) in sub_strings(clean, rustbox.width()).iter().enumerate() {
+          if chunk_index > 0 {
+            long_lines = long_lines + 1;
+          }
+
+          let formatted = format!("{}\n", chunk).to_string();
+          rustbox.print(0, index + long_lines, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
+        }
       }
-      rustbox.print(0, index, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, rustbox.width().to_string().as_str());
-      rustbox.print(4, index, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, line.len().to_string().as_str());
     }
 
     let mut typed_hint: String = "".to_owned();

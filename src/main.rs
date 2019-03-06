@@ -1,5 +1,6 @@
 extern crate rustbox;
 extern crate clap;
+extern crate itertools;
 
 mod state;
 mod alphabets;
