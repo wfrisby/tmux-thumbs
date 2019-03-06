@@ -7,8 +7,11 @@ mod alphabets;
 mod colors;
 mod view;
 
+use std::fs;
 use self::clap::{Arg, App};
+use rustbox::{Color,RustBox};
 use std::process::Command;
+use itertools::Itertools;
 use clap::crate_version;
 
 fn exec_command(command: String) -> std::process::Output {
@@ -105,14 +108,34 @@ fn main() {
     "".to_string()
   };
 
-  let execution = exec_command(format!("tmux capture-pane -e -J -p{}", tmux_subcommand));
-  let output = String::from_utf8_lossy(&execution.stdout);
-  let lines = output.split("\n").collect::<Vec<&str>>();
-
-  let mut state = state::State::new(&lines, alphabet);
-
   let selected = {
+    let mut rustbox = match RustBox::init(Default::default()) {
+      Result::Ok(v) => v,
+      Result::Err(e) => panic!("{}", e),
+    };
+
+    let execution = exec_command(format!("tmux capture-pane -e -J -p{}", tmux_subcommand));
+    let output = String::from_utf8_lossy(&execution.stdout);
+    let pseudo_lines = sub_strings(output.to_string().as_str(), rustbox.width());
+
+    // let lines = pseudo_lines.iter().map(|pseudo_line| pseudo_line.split("\n").collect::<Vec<&str>>()).flatten().collect::<Vec<&str>>();
+    let lines = pseudo_lines.iter().map(|_pseudo_line| vec!["a", "b"]).flatten().collect::<Vec<&str>>();
+
+    fs::write("/tmp/foo", format!("FCSSSS: {:?}", output)).expect("Unable to write file");
+
+    for (index, line) in lines.iter().enumerate() {
+      let clean = line.trim_end_matches(|c: char| c.is_whitespace());
+
+      if clean.len() > 0 {
+        let formatted = format!("{}\n", line).to_string();
+        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
+      }
+    }
+
+    let mut state = state::State::new(&lines, alphabet);
+
     let mut viewbox = view::View::new(
+      &mut rustbox,
       &mut state,
       reverse,
       unique,
@@ -127,10 +150,10 @@ fn main() {
     viewbox.present()
   };
 
+
   if let Some(pane) = args.value_of("tmux_pane") {
     exec_command(format!("tmux swap-pane -t {}", pane));
   };
-
 
   if let Some((text, paste)) = selected {
     exec_command(str::replace(command, "{}", text.as_str()));
@@ -139,5 +162,4 @@ fn main() {
       exec_command(upcase_command.to_string());
     }
   }
-
 }
