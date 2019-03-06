@@ -58,6 +58,8 @@ impl<'a> View<'a> {
         let formatted = format!("{}\n", line).to_string();
         rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, formatted.as_str());
       }
+      rustbox.print(0, index, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, rustbox.width().to_string().as_str());
+      rustbox.print(4, index, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, line.len().to_string().as_str());
     }
 
     let mut typed_hint: String = "".to_owned();
