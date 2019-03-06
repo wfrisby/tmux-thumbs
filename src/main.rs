@@ -77,6 +77,13 @@ fn app_args<'a> () -> clap::ArgMatches<'a> {
     .get_matches();
 }
 
+fn sub_strings(source: &str, sub_size: usize) -> Vec<String> {
+    source.chars()
+        .chunks(sub_size).into_iter()
+        .map(|chunk| chunk.collect::<String>())
+        .collect::<Vec<_>>()
+}
+
 fn main() {
   let args = app_args();
   let alphabet = args.value_of("alphabet").unwrap();
