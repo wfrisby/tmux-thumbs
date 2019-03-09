@@ -3,7 +3,7 @@
 source ~/.bash_profile
 
 # Customize this command
-COMMAND="tmux-thumbs -a qwerty -r -u"
+COMMAND="tmux-thumbs -a qwerty -r -u --fg-color cyan --hint-fg-color green"
 
 CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 TARGET_RELEASE="/target/release/"
