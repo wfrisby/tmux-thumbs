@@ -6,7 +6,7 @@ use super::*;
 
 pub struct View<'a> {
   state: &'a mut state::State<'a>,
-  skip: usize,
+  skip: Option<usize>,
   reverse: bool,
   unique: bool,
   position: &'a str,
@@ -21,7 +21,7 @@ impl<'a> View<'a> {
   pub fn new(state: &'a mut state::State<'a>, reverse: bool, unique: bool, position: &'a str, select_foreground_color: Color, foreground_color: Color, background_color: Color, hint_foreground_color: Color, hint_background_color: Color) -> View<'a> {
     View{
       state: state,
-      skip: 0,
+      skip: None,
       reverse: reverse,
       unique: unique,
       position: position,
@@ -33,14 +33,36 @@ impl<'a> View<'a> {
     }
   }
 
-  pub fn prev(&mut self) {
-    if self.skip > 0 {
-      self.skip = self.skip - 1;
+  fn init(&mut self, max: usize) -> Option<usize> {
+    if self.reverse {
+      Some(0)
+    } else {
+      Some(max)
     }
   }
 
-  pub fn next(&mut self) {
-    self.skip = self.skip + 1;
+  pub fn prev(&mut self, max: usize) {
+    self.skip = if let Some(value) = self.skip {
+      if value > 0 {
+        Some(value - 1)
+      } else {
+        Some(value)
+      }
+    } else {
+      self.init(max)
+    };
+  }
+
+  pub fn next(&mut self, max: usize) {
+    self.skip = if let Some(value) = self.skip {
+      if value < max {
+        Some(value + 1)
+      } else {
+        Some(value)
+      }
+    } else {
+      self.init(max)
+    };
   }
 
   pub fn present(&mut self) -> Option<(String, bool)> {
@@ -63,12 +85,10 @@ impl<'a> View<'a> {
     let mut typed_hint: String = "".to_owned();
     let matches = self.state.matches(self.reverse, self.unique);
     let longest_hint = matches.iter().filter_map(|m| m.hint.clone()).max_by(|x, y| x.len().cmp(&y.len())).unwrap().clone();
-    let mut selected;
+    let mut selected = None;
 
     loop {
-      selected = matches.last();
-
-      match matches.iter().enumerate().find(|&h| h.0 == self.skip) {
+      match matches.iter().enumerate().find(|&h| h.0 == self.skip.unwrap_or(5000)) {
         Some(hm) => {
           selected = Some(hm.1);
         }
@@ -99,22 +119,25 @@ impl<'a> View<'a> {
 
       rustbox.present();
 
+      let max = matches.len();
+      self.skip = self.init(max);
+
       match rustbox.poll_event(false) {
         Ok(rustbox::Event::KeyEvent(key)) => {
           match key {
             Key::Esc => { break; }
             Key::Enter => {
-              match matches.iter().enumerate().find(|&h| h.0 == self.skip) {
+              match matches.iter().enumerate().find(|&h| h.0 == self.skip.unwrap_or(5000)) {
                 Some(hm) => {
                   return Some((hm.1.text.to_string(), false))
                 }
                 _ => panic!("Match not found?"),
               }
             }
-            Key::Up => { self.prev(); }
-            Key::Down => { self.next(); }
-            Key::Left => { self.prev(); }
-            Key::Right => { self.next(); }
+            Key::Up => { self.prev(max); }
+            Key::Down => { self.next(max); }
+            Key::Left => { self.prev(max); }
+            Key::Right => { self.next(max); }
             Key::Char(ch) => {
               let key = ch.to_string();
               let lower_key = key.to_lowercase();

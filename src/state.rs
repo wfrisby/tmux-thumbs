@@ -121,11 +121,10 @@ impl<'a> State<'a> {
     let mut hints = alphabet.hints(matches.len());
 
     // This looks wrong but we do a pop after
-    if !reverse {
-      hints.reverse();
-    } else {
+    hints.reverse();
+
+    if reverse {
       matches.reverse();
-      hints.reverse();
     }
 
     if unique {
