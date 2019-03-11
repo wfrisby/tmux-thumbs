@@ -20,20 +20,20 @@ const PATTERNS: [(&'static str, &'static str); 10] = [
 ];
 
 #[derive(Clone)]
-pub struct Match<'a> {
+pub struct Match {
   pub x: i32,
   pub y: i32,
-  pub text: &'a str,
+  pub text: String,
   pub hint: Option<String>
 }
 
-impl<'a> fmt::Debug for Match<'a> {
+impl fmt::Debug for Match {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(f, "Match {{ x: {}, y: {}, text: {}, hint: <{}> }}", self.x, self.y, self.text, self.hint.clone().unwrap_or("<undefined>".to_string()))
   }
 }
 
-impl<'a> PartialEq for Match<'a> {
+impl PartialEq for Match {
   fn eq(&self, other: &Match) -> bool {
     self.x == other.x && self.y == other.y
   }
@@ -54,7 +54,7 @@ impl<'a> State<'a> {
     }
   }
 
-  pub fn matches(&self, reverse: bool, unique: bool) -> Vec<Match<'a>> {
+  pub fn matches(&self, reverse: bool, unique: bool) -> Vec<Match> {
     let mut matches = Vec::new();
 
     let exclude_patterns = EXCLUDE_PATTERNS.iter().map(|tuple|
@@ -72,7 +72,10 @@ impl<'a> State<'a> {
     let all_patterns = [exclude_patterns, custom_patterns, patterns].concat();
 
     for (index, line) in self.lines.iter().enumerate() {
-      let mut chunk: &str = line;
+      let foo = Regex::new(r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m").unwrap();
+      let kaka = foo.replace(line, "").to_string().clone();
+      let mut chunk: &str = kaka.as_str();
+      // let mut chunk: &str = line;
       let mut offset: i32 = 0;
 
       loop {
@@ -100,7 +103,7 @@ impl<'a> State<'a> {
               matches.push(Match{
                 x: offset + matching.start() as i32 + substart as i32,
                 y: index as i32,
-                text: subtext,
+                text: String::from(subtext),
                 hint: None
               });
             }
@@ -129,14 +132,14 @@ impl<'a> State<'a> {
     }
 
     if unique {
-      let mut previous: HashMap<&str, String> = HashMap::new();
+      let mut previous: HashMap<String, String> = HashMap::new();
 
       for mat in &mut matches {
-        if let Some(previous_hint) = previous.get(mat.text) {
+        if let Some(previous_hint) = previous.get(&mat.text) {
           mat.hint = Some(previous_hint.clone());
         } else if let Some(hint) = hints.pop() {
           mat.hint = Some(hint.to_string().clone());
-          previous.insert(mat.text, hint.to_string().clone());
+          previous.insert(mat.text.clone(), hint.to_string().clone());
         }
       }
     } else {

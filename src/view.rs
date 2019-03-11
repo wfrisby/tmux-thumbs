@@ -1,7 +1,7 @@
-use std::char;
 use std::default::Default;
 use rustbox::{Color, RustBox, OutputMode};
 use rustbox::Key;
+use regex::Regex;
 use super::*;
 
 pub struct View<'a> {
@@ -51,20 +51,19 @@ impl<'a> View<'a> {
 
     rustbox.set_output_mode(OutputMode::EightBit);
 
-    for (index, line) in self.state.lines.iter().enumerate() {
-      let clean = line.trim_end_matches(|c: char| c.is_whitespace());
-
-      if clean.len() > 0 {
-        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, line);
-      }
-    }
-
     let mut typed_hint: String = "".to_owned();
     let matches = self.state.matches(self.reverse, self.unique);
     let longest_hint = matches.iter().filter_map(|m| m.hint.clone()).max_by(|x, y| x.len().cmp(&y.len())).unwrap().clone();
     let mut selected;
+    let foo = Regex::new(r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m").unwrap();
 
     loop {
+      rustbox.clear();
+
+      for (index, line) in self.state.lines.iter().enumerate() {
+        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, foo.replace(line, "").to_string().as_str());
+      }
+
       selected = matches.last();
 
       match matches.iter().enumerate().find(|&h| h.0 == self.skip) {
@@ -87,7 +86,7 @@ impl<'a> View<'a> {
         let extra = prefix.len() - prefix.chars().count();
         let offset = (mat.x as usize) - extra;
 
-        rustbox.print(offset, mat.y as usize, rustbox::RB_NORMAL, selected_color, self.background_color, mat.text);
+        rustbox.print(offset, mat.y as usize, rustbox::RB_NORMAL, selected_color, self.background_color, mat.text.as_str());
 
         if let Some(ref hint) = mat.hint {
           let extra_position = if self.position == "left" { 0 } else { mat.text.len() - mat.hint.clone().unwrap().len() };
