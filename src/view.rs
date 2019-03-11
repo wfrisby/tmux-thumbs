@@ -2,6 +2,7 @@ use std::char;
 use std::default::Default;
 use rustbox::{Color, RustBox, OutputMode};
 use rustbox::Key;
+use regex::Regex;
 use super::*;
 
 pub struct View<'a> {
@@ -51,20 +52,20 @@ impl<'a> View<'a> {
 
     rustbox.set_output_mode(OutputMode::EightBit);
 
-    for (index, line) in self.state.lines.iter().enumerate() {
-      let clean = line.trim_end_matches(|c: char| c.is_whitespace());
-
-      if clean.len() > 0 {
-        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, line);
-      }
-    }
-
     let mut typed_hint: String = "".to_owned();
     let matches = self.state.matches(self.reverse, self.unique);
     let longest_hint = matches.iter().filter_map(|m| m.hint.clone()).max_by(|x, y| x.len().cmp(&y.len())).unwrap().clone();
     let mut selected;
 
     loop {
+      rustbox.clear();
+
+      for (index, line) in self.state.lines.iter().enumerate() {
+        rustbox.print(0, index, rustbox::RB_NORMAL, Color::White, Color::Black, line);
+      }
+
+      rustbox.present();
+
       selected = matches.last();
 
       match matches.iter().enumerate().find(|&h| h.0 == self.skip) {
@@ -74,6 +75,8 @@ impl<'a> View<'a> {
         _ => {}
       }
 
+      selected = None;
+
       for mat in matches.iter() {
         let selected_color = if selected == Some(mat) {
           self.select_foreground_color
@@ -81,18 +84,23 @@ impl<'a> View<'a> {
           self.foreground_color
         };
 
+        let foo = Regex::new(r"[[:cntrl:]]\[([0-9]{1,2};)?([0-9]{1,2})?m").unwrap();
+
         // Find long utf sequences and extract it from mat.x
         let line = &self.state.lines[mat.y as usize];
+
         let prefix = &line[0..mat.x as usize];
-        let extra = prefix.len() - prefix.chars().count();
-        let offset = (mat.x as usize) - extra;
+        let extra_long_utf_chars = prefix.len() - prefix.chars().count();
+        let extra_bash_colors = prefix.len() - foo.replace(prefix, "").len();
+
+        let offset = (mat.x as usize) - extra_long_utf_chars - extra_bash_colors;
 
         rustbox.print(offset, mat.y as usize, rustbox::RB_NORMAL, selected_color, self.background_color, mat.text);
 
         if let Some(ref hint) = mat.hint {
           let extra_position = if self.position == "left" { 0 } else { mat.text.len() - mat.hint.clone().unwrap().len() };
 
-          rustbox.print(offset + extra_position, mat.y as usize, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, hint.as_str());
+          rustbox.print(offset + extra_position, mat.y as usize, rustbox::RB_BOLD, self.hint_foreground_color, self.hint_background_color, hint);
         }
       }
 
