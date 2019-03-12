@@ -1,5 +1,6 @@
 extern crate rustbox;
 extern crate clap;
+extern crate itertools;
 
 mod state;
 mod alphabets;
@@ -8,6 +9,7 @@ mod view;
 
 use self::clap::{Arg, App};
 use std::process::Command;
+use itertools::Itertools;
 use clap::crate_version;
 
 fn exec_command(command: String) -> std::process::Output {
@@ -17,6 +19,13 @@ fn exec_command(command: String) -> std::process::Output {
     .args(&args[1..])
     .output()
     .expect("Couldn't run it");
+}
+
+fn sub_strings(source: &str, sub_size: usize) -> Vec<String> {
+  source.chars()
+    .chunks(sub_size).into_iter()
+    .map(|chunk| chunk.collect::<String>())
+    .collect::<Vec<_>>()
 }
 
 fn app_args<'a> () -> clap::ArgMatches<'a> {
@@ -110,7 +119,8 @@ fn main() {
 
   let execution = exec_command(format!("tmux capture-pane -e -J -p{}", tmux_subcommand));
   let output = String::from_utf8_lossy(&execution.stdout);
-  let lines = output.split("\n").collect::<Vec<&str>>();
+  let pseudo_lines = sub_strings(output.to_string().as_str(), 158); // rustbox.width()
+  let lines = pseudo_lines.iter().map(|pseudo_line| pseudo_line.split("\n").collect::<Vec<&str>>()).flatten().collect::<Vec<&str>>();
 
   let mut state = state::State::new(&lines, alphabet, &regexp);
 
