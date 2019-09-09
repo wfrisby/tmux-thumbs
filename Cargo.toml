@@ -12,3 +12,6 @@ license = "MIT"
 rustbox = "0.11.0"
 regex = "1.1.2"
 clap = "2.32.0"
+
+[patch.crates-io]
+termbox-sys = { git = "https://github.com/wfrisby/termbox-sys" }
